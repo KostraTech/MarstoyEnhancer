@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Marstoy Enhancer",
-  "version": "1.0.0",
-  "description": "Enhances Marstoy product pages using Rebrickable API (titles, images, caching, etc.).",
+  "version": "1.1.0",
+    "description": "Enhances marstoy.com by syncing LEGO data from Rebrickable, improving product images and titles, and adding an integrated ME Search tool.",
   "icons": {
     "16": "images/icon16.png",
     "48": "images/icon48.png",
@@ -23,7 +23,8 @@
   ],
   "host_permissions": [
     "https://marstoy.com/*",
-    "https://rebrickable.com/*"
+    "https://rebrickable.com/*",
+    "https://cdn.rebrickable.com/*"
   ],
   "content_scripts": [
     {

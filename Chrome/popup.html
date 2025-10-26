@@ -2,72 +2,175 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>API Key Setup</title>
+  <title>Marstoy Enhancer</title>
   <style>
-    :root { color-scheme: light dark; }
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 10px; width: 280px; }
-    .row { margin-top: 8px; }
-    .label { font-size: 13px; color: #666; margin-bottom: 4px; }
-    .input-wrap {
-      position: relative; display: flex; align-items: center;
-      border: 1px solid #ccc; border-radius: 8px; padding: 4px 8px;
-      background: transparent;
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      font-size: 13px;
+      line-height: 1.4;
+      color: #f4f4f4;
+      background: #111;
+      min-width: 260px;
+      padding: 14px 16px;
     }
-    input[type="password"], input[type="text"] {
-      border: none; outline: none; flex: 1; background: transparent; padding: 8px 6px;
+
+    h1 {
       font-size: 14px;
+      font-weight: 600;
+      margin: 0 0 8px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
-    .icon-btn {
-      border: none; background: transparent; cursor: pointer; padding: 6px; border-radius: 6px;
+
+    .status-block {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 4px;
+      padding: 2px 6px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      min-height: 20px;
     }
-    .icon-btn:focus-visible { outline: 2px solid #4c8bf5; }
-    .actions { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 10px; }
-    button.primary {
-      padding: 10px 12px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600;
-      background: #0b57d0; color: white;
+
+    .status-label {
+      font-size: 11px;
+      color: #aaa;
     }
-    #status { min-height: 18px; font-size: 12px; color: #2e7d32; margin-top: 6px; }
-    small { color: #666; display: block; margin-top: 8px; line-height: 1.3; }
-    a { color: #0b57d0; text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    /* simple eye icon */
-    .eye {
-      width: 18px; height: 18px; display: inline-block;
-      background: currentColor; -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><path fill="%23000" d="M12 5c4.63 0 8.54 2.94 10 7-1.46 4.06-5.37 7-10 7S3.46 16.06 2 12c1.46-4.06 5.37-7 10-7Zm0 2c-3.53 0-6.69 2.22-7.93 5 1.24 2.78 4.4 5 7.93 5s6.69-2.22 7.93-5C18.69 9.22 15.53 7 12 7Zm0 2.5A2.5 2.5 0 1 1 12 14a2.5 2.5 0 0 1 0-5Z"/></svg>') center/contain no-repeat;
-              mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><path fill="%23000" d="M12 5c4.63 0 8.54 2.94 10 7-1.46 4.06-5.37 7-10 7S3.46 16.06 2 12c1.46-4.06 5.37-7 10-7Zm0 2c-3.53 0-6.69 2.22-7.93 5 1.24 2.78 4.4 5 7.93 5s6.69-2.22 7.93-5C18.69 9.22 15.53 7 12 7Zm0 2.5A2.5 2.5 0 1 1 12 14a2.5 2.5 0 0 1 0-5Z"/></svg>') center/contain no-repeat;
+
+    .section {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 12px;
     }
-    .eye-off {
-      width: 18px; height: 18px; display: inline-block;
-      background: currentColor; -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><path fill="%23000" d="M3.28 2.22 21.78 20.72l-1.06 1.06-3.25-3.25C15.73 19.4 13.94 20 12 20 7.37 20 3.46 17.06 2 13c.67-1.85 1.93-3.47 3.53-4.69L2.22 3.28l1.06-1.06ZM12 6c4.63 0 8.54 2.94 10 7-.49 1.36-1.26 2.59-2.25 3.62l-1.44-1.44C19.89 13.93 20.5 13.02 21 12c-1.24-2.78-4.4-5-7.93-5-1.02.01-1.99.16-2.9.43L8.2 6.02C9.4 6.3 10.67 6.49 12 6Zm-2.2 4.2 4 4A2.5 2.5 0 0 0 9.8 10.2Z"/></svg>') center/contain no-repeat;
-              mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><path fill="%23000" d="M3.28 2.22 21.78 20.72l-1.06 1.06-3.25-3.25C15.73 19.4 13.94 20 12 20 7.37 20 3.46 17.06 2 13c.67-1.85 1.93-3.47 3.53-4.69L2.22 3.28l1.06-1.06ZM12 6c4.63 0 8.54 2.94 10 7-.49 1.36-1.26 2.59-2.25 3.62l-1.44-1.44C19.89 13.93 20.5 13.02 21 12c-1.24-2.78-4.4-5-7.93-5-1.02.01-1.99.16-2.9.43L8.2 6.02C9.4 6.3 10.67 6.49 12 6Zm-2.2 4.2 4 4A2.5 2.5 0 0 0 9.8 10.2Z"/></svg>') center/contain no-repeat;
+
+    .row-line {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .label-small {
+      font-size: 11px;
+      font-weight: 500;
+      color: #eee;
+    }
+
+    .time-value {
+      font-size: 11px;
+      color: #aaa;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      background: #fff;
+      color: #111;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 7px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      min-width: 160px;
+      text-align: center;
+    }
+
+    button:hover {
+      background: #ddd;
+    }
+
+    button[disabled] {
+      background: #555;
+      color: #999;
+      cursor: default;
+    }
+
+    .divider {
+      border-top: 1px solid #333;
+      margin: 8px 0 12px;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: #ccc;
+      cursor: pointer;
+    }
+
+    .toggle-row input[type="checkbox"] {
+      margin: 0;
+      width: 12px;
+      height: 12px;
+    }
+
+    .meta {
+      font-size: 11px;
+      color: #888;
+      line-height: 1.4;
+      margin-top: 8px;
+    }
+
+    .meta a {
+      color: #ccc;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    .meta a:hover {
+      color: #fff;
     }
   </style>
 </head>
 <body>
-  <h3>Rebrickable API Key</h3>
 
-  <div class="row">
-    <div class="label" id="keyLabel">Stored securely in your browser</div>
-    <div class="input-wrap">
-      <input id="apiKeyInput" type="password" inputmode="text" autocomplete="off" spellcheck="false"
-             placeholder="Paste your key" aria-labelledby="keyLabel" />
-      <button id="toggleVisibilityBtn" class="icon-btn" aria-label="Show/Hide API key" title="Show/Hide">
-        <span id="eyeIcon" class="eye-off" aria-hidden="true"></span>
-      </button>
+  <h1>Marstoy Enhancer</h1>
+
+  <!-- Status -->
+  <div class="status-block">
+    <div class="status-label" id="statusLabel">Idle.</div>
+  </div>
+
+  <!-- Catalog + cache controls -->
+  <div class="section">
+
+    <!-- Sync Rebrickable catalog -->
+    <div class="row-line">
+      <button id="refreshBtn">Sync Rebrickable catalog</button>
+      <div>
+        <div class="label-small">Lego catalog last updated:</div>
+        <div class="time-value" id="lastUpdatedCatalog">–</div>
+      </div>
     </div>
+
+    <!-- Sync Marstoy products cache -->
+    <div class="row-line">
+      <button id="syncBtn">Sync Marstoy products cache</button>
+      <div>
+        <div class="label-small">Marstoy cache last synced:</div>
+        <div class="time-value" id="lastSyncedCollection">–</div>
+      </div>
+    </div>
+
   </div>
 
-  <div class="actions">
-    <button id="saveKeyBtn" class="primary">Save Key</button>
+  <div class="divider"></div>
+
+  <!-- Toggle -->
+  <label class="toggle-row">
+    <input id="toggleMeSearch" type="checkbox" />
+    <span>Show ME Search</span>
+  </label>
+
+  <div class="meta">
+    • Use Sync Marstoy products cache for the best results in ME Search.<br/>
+    • <a id="repoLink" href="https://github.com/KostraTech/MarstoyEnhancer" target="_blank" rel="noopener noreferrer">Github</a> · v1.1.0
   </div>
-
-  <small>
-    Get a key by registering at
-    <a href="https://rebrickable.com/" target="_blank" rel="noopener noreferrer">rebrickable.com</a>
-    → Settings → API.
-  </small>
-
-  <p id="status"></p>
 
   <script src="popup.js"></script>
 </body>
