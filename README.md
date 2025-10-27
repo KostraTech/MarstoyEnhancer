@@ -111,6 +111,10 @@ When you click a search result:
 - It opens the corresponding product directly on Marstoy.
 - The link is built from cached product data - no network lookup required.
 
+### 🔍 Full-page search
+- If you press Enter or click the search icon,
+- ME Search will redirect you to the Marstoy search page showing all matching products.
+
 ### ⚙️ Cache cooperation
 - ME Search results come directly from your **Marstoy cache**.
 - When you sync **Marstoy products cache**, new sets appear instantly in ME Search.
