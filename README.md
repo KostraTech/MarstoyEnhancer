@@ -26,10 +26,10 @@ This Chrome extension enhances product pages on [marstoy.com](https://marstoy.co
 ---
 
 ### BEFORE  
-<img src="example/before.png" alt="before" width="900">
+<img src="example/before.png" alt="before" width="800">
 
 ### AFTER  
-<img src="example/after.png" alt="after" width="900">
+<img src="example/after.png" alt="after" width="800">
 
 <p>
   <img src="example/cart.png" alt="cart" width="200">
@@ -59,7 +59,7 @@ This Chrome extension enhances product pages on [marstoy.com](https://marstoy.co
 ### Full-page search
 If you enter, for example, a theme name and press Enter or click the search icon, Marstoy will show all matching products in that theme.
 
-<img src="example/search_results.png" alt="search results" width="900">
+<img src="example/search_results.png" alt="search results" width="800">
 
 ### Clicking results
 When you click a search result:
