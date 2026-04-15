@@ -32,8 +32,8 @@ This Chrome extension enhances product pages on [marstoy.com](https://marstoy.co
 <img src="example/after.png" alt="after" width="900">
 
 <p>
-  <img src="example/cart.png" alt="cart" height="400">
-  <img src="example/you_may_also_like.png" alt="you may also like" width="700">
+  <img src="example/cart.png" alt="cart" width="250">
+  <img src="example/you_may_also_like.png" alt="you may also like" width="600">
 </p>
 
 ---
@@ -51,9 +51,9 @@ This Chrome extension enhances product pages on [marstoy.com](https://marstoy.co
   - Year → `2025`
 
 <p>
-  <img src="example/search_show.png" alt="search panel" width="300">
-  <img src="example/search_name.png" alt="search by name" width="300">
-  <img src="example/search_theme.png" alt="search by theme" height="500">
+  <img src="example/search_show.png" alt="search panel" width="250">
+  <img src="example/search_name.png" alt="search by name" width="250">
+  <img src="example/search_theme.png" alt="search by theme"  width="250">
 </p>
 
 ### Full-page search
