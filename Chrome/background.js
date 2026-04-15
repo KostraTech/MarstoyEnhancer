@@ -1,31 +1,23 @@
-// background.js
+importScripts('shared.js', 'runtime.js');
 
-////////////////////////////
-// Status helper -> popup //
-////////////////////////////
+const { MESSAGE_TYPES, STORAGE_KEYS, toOfficialId } = MarstoyShared;
+const { storageGet, storageSet, sendRuntimeMessage } = MarstoyRuntime;
+
+const REBRICKABLE_URLS = Object.freeze({
+  sets: 'https://cdn.rebrickable.com/media/downloads/sets.csv.gz',
+  themes: 'https://cdn.rebrickable.com/media/downloads/themes.csv.gz',
+});
+
+const MAX_SYNC_PAGES = 200;
+
 function sendStatus({ text, error = false, done = false }) {
-  try {
-    chrome.runtime.sendMessage(
-      {
-        type: 'CATALOG_STATUS',
-        text,
-        error,
-        done
-      },
-      () => {
-        if (chrome.runtime && chrome.runtime.lastError) {
-          // popup not open -> ignore
-        }
-      }
-    );
-  } catch (e) {
-    // ignore
-  }
+  sendRuntimeMessage({
+    type: MESSAGE_TYPES.catalogStatus,
+    text,
+    error,
+    done,
+  });
 }
-
-/////////////////////////////////////////
-// Fetch .csv.gz and gunzip it
-/////////////////////////////////////////
 
 async function gunzipToText(gzUint8) {
   const ds = new DecompressionStream('gzip');
@@ -36,89 +28,105 @@ async function gunzipToText(gzUint8) {
 }
 
 async function fetchGzCsv(urlBase) {
-  const ts = Date.now();
-  const url = `${urlBase}?${ts}=`;
-
+  const url = `${urlBase}?${Date.now()}=`;
   const resp = await fetch(url);
-  if (!resp) throw new Error('No response from ' + urlBase);
-  if (!resp.ok) throw new Error('HTTP ' + resp.status + ' while fetching ' + urlBase);
 
-  const arrBuf = await resp.arrayBuffer();
-  const u8 = new Uint8Array(arrBuf);
-  const csvText = await gunzipToText(u8);
-  return csvText;
+  if (!resp) throw new Error(`No response from ${urlBase}`);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status} while fetching ${urlBase}`);
+
+  return gunzipToText(new Uint8Array(await resp.arrayBuffer()));
 }
 
-/////////////////////////
-// CSV parser
-/////////////////////////
+function splitCsvLine(line) {
+  const cols = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    const next = line[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && next === '"') {
+        current += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (char === ',' && !inQuotes) {
+      cols.push(current.trim());
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  cols.push(current.trim());
+  return cols;
+}
+
 function parseCsvBasic(csvText) {
   const lines = csvText
-    .split('\n')
-    .map(l => l.trim())
-    .filter(l => l.length > 0);
+    .replace(/^\uFEFF/, '')
+    .split(/\r?\n/)
+    .filter(line => line.trim().length > 0);
 
   if (lines.length === 0) return [];
-  const header = lines[0].split(',').map(h => h.trim());
 
-  const rows = [];
-  for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(',');
-    const obj = {};
-    for (let h = 0; h < header.length; h++) {
-      obj[header[h]] = (cols[h] || '').trim();
+  const header = splitCsvLine(lines[0]);
+
+  return lines.slice(1).map(line => {
+    const cols = splitCsvLine(line);
+    const row = {};
+
+    for (let i = 0; i < header.length; i += 1) {
+      row[header[i]] = cols[i] || '';
     }
-    rows.push(obj);
-  }
-  return rows;
+
+    return row;
+  });
 }
 
-///////////////////////////////////////
-// Catalog build
-///////////////////////////////////////
 function buildThemeMap(themeRows) {
-  const map = {};
-  for (const t of themeRows) {
-    map[t.id] = t.name;
+  const themeMap = {};
+  for (const row of themeRows) {
+    themeMap[row.id] = row.name;
   }
-  return map;
+  return themeMap;
 }
 
 function buildCatalog(setsRows, themesRows) {
   const themeMap = buildThemeMap(themesRows);
-  const out = {};
+  const catalog = {};
 
-  for (const s of setsRows) {
-    const setNum = s.set_num || '';
+  for (const row of setsRows) {
+    const setNum = row.set_num || '';
     const officialId = (setNum.split('-')[0] || '').trim();
     if (!officialId) continue;
 
-    const entry = {
-      name: s.name || '',
-      year: s.year || '',
-      imageUrl: s.img_url || s.set_img_url || '',
+    catalog[officialId] = {
+      name: row.name || '',
+      year: row.year || '',
+      imageUrl: row.img_url || row.set_img_url || '',
       setNum,
       officialId,
-      themeName: themeMap[s.theme_id] || ''
+      themeName: themeMap[row.theme_id] || '',
     };
-
-    out[officialId] = entry;
   }
-  return out;
+
+  return catalog;
 }
 
-/////////////////////////////////////////
-// Refresh Lego catalog
-/////////////////////////////////////////
 async function refreshCatalog() {
-  const SETS_GZ_URL   = "https://cdn.rebrickable.com/media/downloads/sets.csv.gz";
-  const THEMES_GZ_URL = "https://cdn.rebrickable.com/media/downloads/themes.csv.gz";
-
   sendStatus({ text: 'Downloading sets.csv.gz…' });
-  const setsCsvText = await fetchGzCsv(SETS_GZ_URL);
+  const setsCsvText = await fetchGzCsv(REBRICKABLE_URLS.sets);
 
   sendStatus({ text: 'Downloading themes.csv.gz…' });
-  const themesCsvText = await fetchGzCsv(THEMES_GZ_URL);
+  const themesCsvText = await fetchGzCsv(REBRICKABLE_URLS.themes);
 
   sendStatus({ text: 'Parsing CSV…' });
   const setsRows = parseCsvBasic(setsCsvText);
@@ -127,230 +135,159 @@ async function refreshCatalog() {
   sendStatus({ text: 'Building catalog…' });
   const catalog = buildCatalog(setsRows, themesRows);
 
-  await chrome.storage.local.set({
-    CATALOG_DATA: catalog,
-    CATALOG_LAST_UPDATED: Date.now()
+  await storageSet({
+    [STORAGE_KEYS.catalogData]: catalog,
+    [STORAGE_KEYS.catalogLastUpdated]: Date.now(),
   });
 
   sendStatus({ text: '✅ Done. Lego catalog saved.', done: true });
 }
 
-/////////////////////////////////////////
-// Helpers for sync of Marstoy cache
-/////////////////////////////////////////
-
-// Convert "M12345" -> "54321" reversed
-function toOfficialIdFromStoreId(storeId) {
-  if (!storeId) return "";
-  const norm = storeId.toUpperCase().trim();
-  const body = norm.slice(1);
-  return body.split("").reverse().join("");
-}
-
-// Strip HTML tags like <span>...</span> out of a string
 function stripHtmlTags(str) {
-  return str.replace(/<[^>]*>/g, "").trim();
+  return str.replace(/<[^>]*>/g, '').trim();
 }
 
-// Extract all product cards from one HTML page string.
-// No DOMParser: use regex to find <a ...href="/products/...">...</a> blocks.
-// Returns { products: [...], done: boolean }
+function normalizeProductHref(href) {
+  if (!href) return '';
+  return href.startsWith('/') ? `https://marstoy.com${href}` : href;
+}
+
+function extractStoreIdFromHref(href) {
+  const fromProductPath = href.match(/\/products\/.*?([mn]\d+)/i);
+  if (fromProductPath) return fromProductPath[1].toUpperCase();
+
+  const fromAnywhere = href.match(/([mn]\d+)/i);
+  if (fromAnywhere) return fromAnywhere[1].toUpperCase();
+
+  return '';
+}
+
 async function scrapeBrickKitsPage(pageNum) {
   const url = `https://marstoy.com/collections/brick-kits?page_num=${pageNum}`;
+  const resp = await fetch(url, { credentials: 'include' });
 
-  const resp = await fetch(url, { credentials: "include" });
   if (!resp.ok) {
-    // If the page is not OK (404 etc), assume we're past the end
     return { products: [], done: true };
   }
 
   const html = await resp.text();
-
-  // We'll collect possible product links like:
-  // <a ... href="/products/m12345-some-title" ...> ...title text... </a>
-  //
-  // We do a global regex for <a ... href="/products/...">...</a>
-  // and then we later dedupe by href.
   const linkRegex = /<a\b[^>]*href="([^"]*\/products\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
-
   const seenHrefs = new Set();
   const products = [];
 
   let match;
   while ((match = linkRegex.exec(html)) !== null) {
-    let href = match[1] || "";
-    let innerHtml = match[2] || "";
+    const href = match[1] || '';
+    const innerHtml = match[2] || '';
 
-    if (!href.includes("/products/")) continue;
-    if (seenHrefs.has(href)) continue;
+    if (!href.includes('/products/') || seenHrefs.has(href)) continue;
     seenHrefs.add(href);
 
-    // Extract storeId (M12345 / N12345) from href
-    // e.g. /products/m12345-some-title
-    let storeId = null;
-    const m1 = href.match(/\/products\/.*?([mn]\d+)/i);
-    if (m1) {
-      storeId = m1[1].toUpperCase();
-    } else {
-      const m2 = href.match(/([mn]\d+)/i);
-      if (m2) {
-        storeId = m2[1].toUpperCase();
-      }
-    }
-
-    // Clean up link text to get visible product name.
-    // Remove tags inside <a> ... we only want readable product title-ish text.
-    const shopName = stripHtmlTags(innerHtml);
-
-    // Build absolute URL
-    let absoluteUrl = href;
-    if (absoluteUrl.startsWith("/")) {
-      absoluteUrl = "https://marstoy.com" + absoluteUrl;
-    }
-
     products.push({
-      storeId: storeId || "",
-      shopName: shopName || "",
-      url: absoluteUrl
+      storeId: extractStoreIdFromHref(href),
+      shopName: stripHtmlTags(innerHtml),
+      url: normalizeProductHref(href),
     });
   }
 
-  // If we found zero products on this page, treat that as "stop".
-  const done = products.length === 0;
-  return { products, done };
+  return {
+    products,
+    done: products.length === 0,
+  };
 }
 
-// Walk all pages, enrich with Lego catalog data, save ALL_BRICK_KITS
+function buildBrickKitEntry(product, catalog) {
+  const storeId = product.storeId || '';
+  const officialId = toOfficialId(storeId);
+  const catalogEntry = officialId ? catalog[officialId] : null;
+
+  return {
+    officialId: officialId || '',
+    storeId,
+    name: catalogEntry?.name || product.shopName || '',
+    year: catalogEntry?.year || '',
+    themeName: catalogEntry?.themeName || '',
+    url: product.url || '',
+  };
+}
+
 async function syncBrickKitsCollection() {
   sendStatus({ text: 'Syncing Marstoy cache…' });
 
-  // Get catalog so we can attach theme/year/name
-  const { CATALOG_DATA } = await chrome.storage.local.get(["CATALOG_DATA"]);
-  const catalog = CATALOG_DATA || {};
-
+  const catalog = (await storageGet([STORAGE_KEYS.catalogData]))[STORAGE_KEYS.catalogData] || {};
   const finalList = [];
-  let pageNum = 1;
 
-  while (true) {
+  for (let pageNum = 1; pageNum <= MAX_SYNC_PAGES; pageNum += 1) {
     sendStatus({ text: `Syncing page ${pageNum}…` });
 
     const { products, done } = await scrapeBrickKitsPage(pageNum);
     if (done) break;
 
-    for (const p of products) {
-      const storeId = p.storeId || "";
-      const officialId = toOfficialIdFromStoreId(storeId); // "LEGO set number" derived
-      const catEntry = officialId ? catalog[officialId] : null;
-
-      finalList.push({
-        officialId: officialId || "",
-        storeId: storeId || "",
-        name: (catEntry && catEntry.name) || p.shopName || "",
-        year: (catEntry && catEntry.year) || "",
-        themeName: (catEntry && catEntry.themeName) || "",
-        url: p.url || ""
-      });
+    for (const product of products) {
+      finalList.push(buildBrickKitEntry(product, catalog));
     }
-
-    pageNum++;
-    if (pageNum > 200) break; // safety stop
   }
 
-  await chrome.storage.local.set({
-    ALL_BRICK_KITS: finalList,
-    ALL_BRICK_KITS_LAST_SYNC: Date.now()
+  await storageSet({
+    [STORAGE_KEYS.allBrickKits]: finalList,
+    [STORAGE_KEYS.allBrickKitsLastSync]: Date.now(),
   });
 
   sendStatus({ text: `✅ Synced ${finalList.length} products.`, done: true });
 }
 
-/////////////////////////////////////////
-// Message handlers
-/////////////////////////////////////////
-
 function handleLookup(officialId, sendResponse) {
-  chrome.storage.local.get(['CATALOG_DATA'], (res) => {
-    const cat = res.CATALOG_DATA || {};
-    const entry = cat[officialId] || null;
-    sendResponse({ entry });
+  storageGet([STORAGE_KEYS.catalogData]).then(res => {
+    const catalog = res[STORAGE_KEYS.catalogData] || {};
+    sendResponse({ entry: catalog[officialId] || null });
   });
+}
+
+async function runAction(action, failurePrefix) {
+  try {
+    await action();
+  } catch (err) {
+    console.error(failurePrefix, err);
+    sendStatus({
+      text: `❌ ${failurePrefix}: ${err && err.message ? err.message : err}`,
+      error: true,
+      done: true,
+    });
+  }
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || !msg.type) return;
 
-  if (msg.type === 'REFRESH_CATALOG') {
-    (async () => {
-      try {
-        await refreshCatalog();
-      } catch (err) {
-        console.error('Catalog refresh failed:', err);
-        sendStatus({
-          text: '❌ Catalog update failed: ' + (err && err.message ? err.message : err),
-          error: true,
-          done: true
-        });
-      }
-    })();
+  if (msg.type === MESSAGE_TYPES.refreshCatalog) {
+    runAction(refreshCatalog, 'Catalog update failed');
     sendResponse({ ok: true });
     return;
   }
 
-  if (msg.type === 'SYNC_COLLECTION') {
-    (async () => {
-      try {
-        await syncBrickKitsCollection();
-      } catch (err) {
-        console.error('Sync collection failed:', err);
-        sendStatus({
-          text: '❌ Cache sync failed: ' + (err && err.message ? err.message : err),
-          error: true,
-          done: true
-        });
-      }
-    })();
+  if (msg.type === MESSAGE_TYPES.syncCollection) {
+    runAction(syncBrickKitsCollection, 'Cache sync failed');
     sendResponse({ ok: true });
     return;
   }
 
-  if (msg.type === 'LOOKUP_SET') {
+  if (msg.type === MESSAGE_TYPES.lookupSet) {
     handleLookup(msg.officialId, sendResponse);
-    return true; // keep sendResponse async
+    return true;
   }
 });
 
-/////////////////////////////////////////
-// On install: auto refresh Lego catalog
-/////////////////////////////////////////
-chrome.runtime.onInstalled.addListener(async (details) => {
+chrome.runtime.onInstalled.addListener(async details => {
+  if (details.reason !== 'install') return;
+
   try {
-    if (details.reason === "install") {
-      await refreshCatalog();
-    }
-    // optional:
-    // await syncBrickKitsCollection();
+    await refreshCatalog();
   } catch (err) {
-    console.error("Initial catalog fetch failed:", err);
+    console.error('Initial catalog fetch failed:', err);
     sendStatus({
-      text: '❌ Initial catalog fetch failed: ' + (err && err.message ? err.message : err),
+      text: `❌ Initial catalog fetch failed: ${err && err.message ? err.message : err}`,
       error: true,
-      done: true
+      done: true,
     });
-  }
-});
-
-/////////////////////////////////////////
-// Toolbar click injects content.js and runs convert
-/////////////////////////////////////////
-chrome.action.onClicked.addListener(async (tab) => {
-  try {
-    if (!tab || !tab.id) return;
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: ["content.js"]
-    });
-    await chrome.tabs.sendMessage(tab.id, { action: "convert" });
-  } catch (e) {
-    console.error("Manual convert failed:", e);
   }
 });

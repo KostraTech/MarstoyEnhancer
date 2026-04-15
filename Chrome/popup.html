@@ -125,21 +125,22 @@
     .meta a:hover {
       color: #fff;
     }
+
+    #updateLink {
+      display: none;
+      margin-left: 4px;
+    }
   </style>
 </head>
 <body>
 
   <h1>Marstoy Enhancer</h1>
 
-  <!-- Status -->
   <div class="status-block">
     <div class="status-label" id="statusLabel">Idle.</div>
   </div>
 
-  <!-- Catalog + cache controls -->
   <div class="section">
-
-    <!-- Sync Rebrickable catalog -->
     <div class="row-line">
       <button id="refreshBtn">Sync Rebrickable catalog</button>
       <div>
@@ -148,7 +149,6 @@
       </div>
     </div>
 
-    <!-- Sync Marstoy products cache -->
     <div class="row-line">
       <button id="syncBtn">Sync Marstoy products cache</button>
       <div>
@@ -156,12 +156,10 @@
         <div class="time-value" id="lastSyncedCollection">–</div>
       </div>
     </div>
-
   </div>
 
   <div class="divider"></div>
 
-  <!-- Toggle -->
   <label class="toggle-row">
     <input id="toggleMeSearch" type="checkbox" />
     <span>Show ME Search</span>
@@ -169,9 +167,13 @@
 
   <div class="meta">
     • Use Sync Marstoy products cache for the best results in ME Search.<br/>
-    • <a id="repoLink" href="https://github.com/KostraTech/MarstoyEnhancer" target="_blank" rel="noopener noreferrer">Github</a> · v1.1.0
+    • <a href="https://github.com/KostraTech/MarstoyEnhancer" target="_blank" rel="noopener noreferrer">GitHub</a>
+    <span id="versionText"></span>
+    <a id="updateLink" href="https://github.com/KostraTech/MarstoyEnhancer/releases" target="_blank" rel="noopener noreferrer">(Update available)</a>
   </div>
 
+    <script src="shared.js"></script>
+  <script src="runtime.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

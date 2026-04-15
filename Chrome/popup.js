@@ -1,128 +1,187 @@
 (function () {
-  const statusLabelEl = document.getElementById("statusLabel");
-  const lastUpdatedCatalogEl = document.getElementById("lastUpdatedCatalog");
-  const lastSyncedCollectionEl = document.getElementById("lastSyncedCollection");
-  const refreshBtn = document.getElementById("refreshBtn");
-  const syncBtn = document.getElementById("syncBtn");
-  const repoLink = document.getElementById("repoLink");
-  const toggleMeSearchEl = document.getElementById("toggleMeSearch");
+  const { MESSAGE_TYPES, STORAGE_KEYS, compareVersions, formatTimestamp } = MarstoyShared;
+  const { storageGet, storageSet, sendRuntimeMessage, sendTabMessage } = MarstoyRuntime;
 
-  const GITHUB_URL = "https://github.com/KostraTech/MarstoyEnhancer";
+  const els = {
+    statusLabel: document.getElementById('statusLabel'),
+    lastUpdatedCatalog: document.getElementById('lastUpdatedCatalog'),
+    lastSyncedCollection: document.getElementById('lastSyncedCollection'),
+    refreshBtn: document.getElementById('refreshBtn'),
+    syncBtn: document.getElementById('syncBtn'),
+    toggleMeSearch: document.getElementById('toggleMeSearch'),
+    versionText: document.getElementById('versionText'),
+    updateLink: document.getElementById('updateLink'),
+  };
+
+  const GITHUB_LATEST_RELEASE_API = 'https://api.github.com/repos/KostraTech/MarstoyEnhancer/releases/latest';
+  const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+  const CURRENT_VERSION = `v${chrome.runtime.getManifest().version}`;
 
   function setStatus(msg) {
-    statusLabelEl.textContent = msg;
+    els.statusLabel.textContent = msg;
   }
 
-  function setLoadingCatalog(isLoading) {
-    refreshBtn.disabled = isLoading;
+  function setButtonLoading(button, isLoading) {
+    button.disabled = isLoading;
   }
 
-  function setLoadingCollection(isLoading) {
-    syncBtn.disabled = isLoading;
-  }
+  function renderVersionInfo(latestTag = '', hasUpdate = false) {
+    els.versionText.textContent = `GitHub · ${CURRENT_VERSION}`;
 
-  function formatTimestamp(ts) {
-    if (!ts) return "never";
-    try {
-      const d = new Date(ts);
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-        d.getDate()
-      ).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(
-        d.getMinutes()
-      ).padStart(2, "0")}`;
-    } catch {
-      return String(ts);
+    if (hasUpdate && latestTag) {
+      els.updateLink.textContent = '(Update available)';
+      els.updateLink.style.display = 'inline';
+      els.updateLink.title = `Latest release: ${latestTag}`;
+      return;
     }
+
+    els.updateLink.textContent = '';
+    els.updateLink.style.display = 'none';
+    els.updateLink.removeAttribute('title');
   }
 
-  function loadTimestamps() {
-    chrome.storage.local.get(
-      ["CATALOG_LAST_UPDATED", "ALL_BRICK_KITS_LAST_SYNC"],
-      (res) => {
-        lastUpdatedCatalogEl.textContent = formatTimestamp(res.CATALOG_LAST_UPDATED);
-        lastSyncedCollectionEl.textContent = formatTimestamp(res.ALL_BRICK_KITS_LAST_SYNC);
-      }
-    );
+  async function loadTimestamps() {
+    const res = await storageGet([
+      STORAGE_KEYS.catalogLastUpdated,
+      STORAGE_KEYS.allBrickKitsLastSync,
+    ]);
+
+    els.lastUpdatedCatalog.textContent = formatTimestamp(res[STORAGE_KEYS.catalogLastUpdated]);
+    els.lastSyncedCollection.textContent = formatTimestamp(res[STORAGE_KEYS.allBrickKitsLastSync]);
+  }
+
+  function startJob(button, statusText, messageType, failureText) {
+    setButtonLoading(button, true);
+    setStatus(statusText);
+    sendRuntimeMessage({ type: messageType }, () => {
+      setStatus(failureText);
+      setButtonLoading(button, false);
+    });
   }
 
   function triggerRefreshCatalog() {
-    setLoadingCatalog(true);
-    setStatus("Updating Lego catalog…");
-
-    chrome.runtime.sendMessage({ type: "REFRESH_CATALOG" }, () => {
-      if (chrome.runtime.lastError) {
-        setStatus("Failed to start catalog update.");
-        setLoadingCatalog(false);
-      }
-    });
+    startJob(
+      els.refreshBtn,
+      'Updating Lego catalog…',
+      MESSAGE_TYPES.refreshCatalog,
+      'Failed to start catalog update.'
+    );
   }
 
   function triggerSyncCollection() {
-    setLoadingCollection(true);
-    setStatus("Syncing Marstoy cache…");
-
-    chrome.runtime.sendMessage({ type: "SYNC_COLLECTION" }, () => {
-      if (chrome.runtime.lastError) {
-        setStatus("Failed to start cache sync.");
-        setLoadingCollection(false);
-      }
-    });
+    startJob(
+      els.syncBtn,
+      'Syncing Marstoy cache…',
+      MESSAGE_TYPES.syncCollection,
+      'Failed to start cache sync.'
+    );
   }
 
-  function openGitHub(e) {
-    e.preventDefault();
-    chrome.tabs.create({ url: GITHUB_URL });
-  }
+  async function loadMeSearchToggle() {
+    const res = await storageGet([STORAGE_KEYS.showMeSearch]);
+    const hasSetting = Object.prototype.hasOwnProperty.call(res, STORAGE_KEYS.showMeSearch);
+    const isEnabled = hasSetting ? !!res[STORAGE_KEYS.showMeSearch] : true;
 
-  // ====== ME Search toggle (default ON) ======
-  function loadMeSearchToggle() {
-    chrome.storage.local.get(["SHOW_ME_SEARCH"], (res) => {
-      const hasSetting = Object.prototype.hasOwnProperty.call(res, "SHOW_ME_SEARCH");
-      const isEnabled = hasSetting ? !!res.SHOW_ME_SEARCH : true; // default ON
-      toggleMeSearchEl.checked = isEnabled;
+    els.toggleMeSearch.checked = isEnabled;
 
-      // if the key doesn't exist, create it as true => first load = enabled
-      if (!hasSetting && isEnabled) {
-        chrome.storage.local.set({ SHOW_ME_SEARCH: true });
-      }
-    });
+    if (!hasSetting && isEnabled) {
+      await storageSet({ [STORAGE_KEYS.showMeSearch]: true });
+    }
   }
 
   function saveMeSearchToggle() {
-    const enabled = toggleMeSearchEl.checked;
-    chrome.storage.local.set({ SHOW_ME_SEARCH: enabled }, () => {
-      // notify the active tab to show/hide the ME Search panel immediately
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const enabled = els.toggleMeSearch.checked;
+
+    storageSet({ [STORAGE_KEYS.showMeSearch]: enabled }).then(() => {
+      chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
         if (!tabs || !tabs[0]) return;
-        chrome.tabs.sendMessage(tabs[0].id, {
-          type: "TOGGLE_ME_SEARCH_VISIBILITY",
+
+        sendTabMessage(tabs[0].id, {
+          type: MESSAGE_TYPES.toggleMeSearchVisibility,
           enabled,
+          resetPosition: true,
         });
       });
     });
   }
 
-  // Listen for status updates from the background script
-  chrome.runtime.onMessage.addListener((msg) => {
-    if (msg?.type === "CATALOG_STATUS") {
-      if (msg.text) setStatus(msg.text);
+  async function fetchLatestReleaseTag() {
+    const resp = await fetch(GITHUB_LATEST_RELEASE_API, {
+      headers: { Accept: 'application/vnd.github+json' },
+      cache: 'no-store',
+    });
 
-      if (msg.done || msg.error) {
-        setLoadingCatalog(false);
-        setLoadingCollection(false);
-        loadTimestamps();
-      }
+    if (!resp.ok) {
+      throw new Error(`GitHub API HTTP ${resp.status}`);
     }
-  });
 
-  // Event bindings
-  refreshBtn.addEventListener("click", triggerRefreshCatalog);
-  syncBtn.addEventListener("click", triggerSyncCollection);
-  repoLink.addEventListener("click", openGitHub);
-  toggleMeSearchEl.addEventListener("change", saveMeSearchToggle);
+    const data = await resp.json();
+    return String(data?.tag_name || '').trim();
+  }
 
-  // Initialize popup UI
-  setStatus("Idle.");
-  loadTimestamps();
-  loadMeSearchToggle();
+  async function loadGitHubUpdateState() {
+    renderVersionInfo();
+
+    try {
+      const cached = (await storageGet([STORAGE_KEYS.updateCheckCache]))[STORAGE_KEYS.updateCheckCache] || null;
+      const now = Date.now();
+
+      if (
+        cached &&
+        cached.currentVersion === CURRENT_VERSION &&
+        typeof cached.checkedAt === 'number' &&
+        now - cached.checkedAt < ONE_WEEK_MS
+      ) {
+        renderVersionInfo(cached.latestTag || '', !!cached.hasUpdate);
+        return;
+      }
+
+      const latestTag = await fetchLatestReleaseTag();
+      const hasUpdate = !!latestTag && compareVersions(latestTag, CURRENT_VERSION) > 0;
+
+      await storageSet({
+        [STORAGE_KEYS.updateCheckCache]: {
+          checkedAt: now,
+          currentVersion: CURRENT_VERSION,
+          latestTag,
+          hasUpdate,
+        },
+      });
+
+      renderVersionInfo(latestTag, hasUpdate);
+    } catch {
+      renderVersionInfo();
+    }
+  }
+
+  function handleStatusMessage(msg) {
+    if (msg?.type !== MESSAGE_TYPES.catalogStatus) return;
+
+    if (msg.text) {
+      setStatus(msg.text);
+    }
+
+    if (msg.done || msg.error) {
+      setButtonLoading(els.refreshBtn, false);
+      setButtonLoading(els.syncBtn, false);
+      loadTimestamps();
+    }
+  }
+
+  function bindEvents() {
+    chrome.runtime.onMessage.addListener(handleStatusMessage);
+    els.refreshBtn.addEventListener('click', triggerRefreshCatalog);
+    els.syncBtn.addEventListener('click', triggerSyncCollection);
+    els.toggleMeSearch.addEventListener('change', saveMeSearchToggle);
+  }
+
+  async function init() {
+    bindEvents();
+    setStatus('Idle.');
+    await loadTimestamps();
+    await loadMeSearchToggle();
+    await loadGitHubUpdateState();
+  }
+
+  init();
 })();
