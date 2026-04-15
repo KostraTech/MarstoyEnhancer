@@ -32,8 +32,8 @@ This Chrome extension enhances product pages on [marstoy.com](https://marstoy.co
 <img src="example/after.png" alt="after" width="900">
 
 <p>
-  <img src="example/cart.png" alt="cart" width="250">
-  <img src="example/you_may_also_like.png" alt="you may also like" width="600">
+  <img src="example/cart.png" alt="cart" width="200">
+  <img src="example/you_may_also_like.png" alt="you may also like" width="550">
 </p>
 
 ---
